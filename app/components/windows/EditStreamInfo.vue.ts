@@ -16,13 +16,20 @@ import { WindowsService } from 'services/windows';
 import { NavigationService } from 'services/navigation';
 import { CustomizationService } from 'services/customization';
 import { Multiselect } from 'vue-multiselect';
-import { $t } from 'services/i18n';
+import { $t, I18nService } from 'services/i18n';
 import {
   VideoEncodingOptimizationService,
   IEncoderPreset,
 } from 'services/video-encoding-optimizations';
 import { IStreamlabsFacebookPage, IStreamlabsFacebookPages } from 'services/platforms/facebook';
 import { shell } from 'electron';
+import TwitchTagsInput from 'components/shared/inputs/TwitchTagsInput.vue';
+import {
+  prepareOptions,
+  TwitchTag,
+  TwitchTagWithLabel,
+} from '../../services/platforms/twitch/tags';
+import { TwitchService } from '../../services/platforms/twitch';
 
 interface IMultiSelectProfiles {
   value: IEncoderPreset;
@@ -37,6 +44,7 @@ interface IMultiSelectProfiles {
     BoolInput,
     HFormGroup,
     Multiselect,
+    TwitchTagsInput,
   },
 })
 export default class EditStreamInfo extends Vue {
@@ -47,6 +55,8 @@ export default class EditStreamInfo extends Vue {
   @Inject() navigationService: NavigationService;
   @Inject() customizationService: CustomizationService;
   @Inject() videoEncodingOptimizationService: VideoEncodingOptimizationService;
+  @Inject() twitchService: TwitchService;
+  @Inject() i18nService: I18nService;
 
   // UI State Flags
   searchingGames = false;
@@ -92,6 +102,10 @@ export default class EditStreamInfo extends Vue {
   // Debounced Functions:
   debouncedGameSearch: (search: string) => void;
 
+  allTwitchTags: TwitchTag[] = null;
+
+  twitchTags: TwitchTagWithLabel[] = null;
+
   async created() {
     this.debouncedGameSearch = debounce((search: string) => this.onGameSearchChange(search), 500);
 
@@ -113,6 +127,18 @@ export default class EditStreamInfo extends Vue {
     } else {
       // If the stream info pre-fetch failed, we should try again now
       this.refreshStreamInfo();
+    }
+
+    if (this.isTwitch) {
+      this.allTwitchTags = await this.twitchService.getAllTags();
+      this.twitchTags = await this.twitchService
+        .getStreamTags()
+        .then(tags =>
+          prepareOptions(
+            this.i18nService.state.locale || this.i18nService.getFallbackLocale(),
+            tags,
+          ),
+        );
     }
   }
 
@@ -292,7 +318,10 @@ export default class EditStreamInfo extends Vue {
   }
 
   goLive() {
-    this.streamingService.toggleStreaming();
+    this.streamingService.toggleStreaming({
+      allTwitchTags: this.allTwitchTags,
+      twitchTags: this.twitchTags,
+    });
     this.navigationService.navigate('Live');
     this.windowsService.closeChildWindow();
   }
@@ -306,6 +335,10 @@ export default class EditStreamInfo extends Vue {
     this.streamInfoService.refreshStreamInfo().then(() => {
       if (this.streamInfoService.state.channelInfo) this.populateModels();
     });
+  }
+
+  setTags(tags: TwitchTagWithLabel[]) {
+    this.twitchTags = tags;
   }
 
   get isTwitch() {

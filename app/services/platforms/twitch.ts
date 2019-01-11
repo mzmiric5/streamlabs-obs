@@ -5,6 +5,8 @@ import { SettingsService } from 'services/settings';
 import { Inject } from 'util/injector';
 import { handleResponse, requiresToken, authorizedHeaders } from 'util/requests';
 import { UserService } from 'services/user';
+import { getAllTags, getStreamTags, TwitchRequestHeaders, updateTags } from './twitch/tags';
+import { StreamingContext } from '../streaming';
 
 export class TwitchService extends Service implements IPlatformService {
   @Inject() hostsService: HostsService;
@@ -23,7 +25,7 @@ export class TwitchService extends Service implements IPlatformService {
     const host = this.hostsService.streamlabs;
     const query =
       `_=${Date.now()}&skip_splash=true&external=electron&twitch&force_verify&` +
-      'scope=channel_read,channel_editor&origin=slobs';
+      'scope=channel_read,channel_editor,user:edit:broadcast&origin=slobs';
     return `https://${host}/slobs/login?${query}`;
   }
 
@@ -35,14 +37,27 @@ export class TwitchService extends Service implements IPlatformService {
     return this.userService.platform.id;
   }
 
-  getHeaders(authorized = false): Headers {
+  getRawHeaders(authorized = false, isNewApi = false) {
+    const map: TwitchRequestHeaders = {
+      'Client-Id': this.clientId,
+      Accept: 'application/vnd.twitchtv.v5+json',
+      'Content-Type': 'application/json',
+    };
+
+    return authorized
+      ? {
+          ...map,
+          Authorization: `${isNewApi ? 'Bearer' : 'OAuth'} ${this.oauthToken}`,
+        }
+      : map;
+  }
+
+  getHeaders(authorized = false, isNewApi = false): Headers {
     const headers = new Headers();
 
-    headers.append('Client-Id', this.clientId);
-    headers.append('Accept', 'application/vnd.twitchtv.v5+json');
-    headers.append('Content-Type', 'application/json');
-
-    if (authorized) headers.append('Authorization', `OAuth ${this.oauthToken}`);
+    Object.entries(this.getRawHeaders(authorized, isNewApi)).forEach(([key, value]) => {
+      headers.append(key, value);
+    });
 
     return headers;
   }
@@ -157,6 +172,16 @@ export class TwitchService extends Service implements IPlatformService {
     );
   }
 
+  @requiresToken()
+  getAllTags() {
+    return getAllTags(this.getRawHeaders(true));
+  }
+
+  @requiresToken()
+  getStreamTags() {
+    return getStreamTags(this.twitchId, this.getRawHeaders(true, true));
+  }
+
   searchCommunities(searchString: string) {
     const headers = this.getHeaders();
 
@@ -184,7 +209,10 @@ export class TwitchService extends Service implements IPlatformService {
       .then(json => json.results[0].hits);
   }
 
-  beforeGoLive() {
-    return Promise.resolve();
+  async beforeGoLive() {}
+
+  @requiresToken()
+  async afterGoLive(context: StreamingContext) {
+    updateTags(this.getRawHeaders(true, true))(context.twitchTags)(this.twitchId);
   }
 }

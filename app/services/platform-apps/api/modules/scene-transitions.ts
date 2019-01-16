@@ -1,7 +1,4 @@
 import path from 'path';
-import electron from 'electron';
-import util from 'util';
-import mkdirpModule from 'mkdirp';
 import { getType } from 'mime';
 import { apiMethod, EApiPermissions, IApiContext, Module } from './module';
 import {
@@ -11,9 +8,7 @@ import {
 } from 'services/transitions';
 import { Inject } from 'util/injector';
 import { ILoadedApp, PlatformAppsService } from '../../index';
-import { downloadFile, getChecksum } from 'util/requests';
-
-const mkdirp = util.promisify(mkdirpModule);
+import { PlatformAppAssetsService } from 'services/platform-apps/platform-app-assets-service';
 
 type AudioFadeStyle = 'fadeOut' | 'crossFade';
 
@@ -87,9 +82,11 @@ export class SceneTransitionsModule extends Module {
 
   permissions = [EApiPermissions.SceneTransitions];
 
-  @Inject() transitionsService: TransitionsService;
+  @Inject() private transitionsService: TransitionsService;
 
-  @Inject() platformAppsService: PlatformAppsService;
+  @Inject() private platformAppsService: PlatformAppsService;
+
+  @Inject() private platformAppAssetsService: PlatformAppAssetsService;
 
   /**
    * Create a scene transition
@@ -113,21 +110,9 @@ export class SceneTransitionsModule extends Module {
         throw new Error('Invalid file specified, you must provide a video file.');
       }
 
-      const app = this.platformAppsService.getApp(appId);
-      const appAssetsDir = await ensureAssets(app);
-
-      if (!app.assets[url]) {
-        const originalUrl = this.platformAppsService.getAssetUrl(appId, options.url);
-
-        const filePath = path.join(appAssetsDir, path.basename(originalUrl));
-
-        // TODO: what if file is being used
-        await downloadFile(originalUrl, filePath);
-
-        app.assets[url] = await getChecksum(filePath);
-
+      if (!this.platformAppAssetsService.hasAsset(appId, url)) {
         // TODO: avoid mutation
-        options.url = filePath;
+        options.url = await this.platformAppAssetsService.addPlatformAppAsset(appId, url);
       }
 
       const { shouldLock = false, name, ...settings } = options;
@@ -304,27 +289,3 @@ export class SceneTransitionsModule extends Module {
     return /^video\/.*$/.test(mimeType);
   }
 }
-
-/**
- * Ensure the App instance has an assets key and that the assets directory exist
- *
- * @param app App instance
- * @returns Assets directory path for this app
- */
-const ensureAssets = async (app: ILoadedApp): Promise<string> => {
-  if (!app.assets) {
-    app.assets = {};
-  }
-
-  const appAssetsDir = path.join(
-    // prettier-ignore
-    electron.remote.app.getPath('userData'),
-    'Media',
-    'Apps',
-    app.id,
-  );
-
-  await mkdirp(appAssetsDir);
-
-  return appAssetsDir;
-};

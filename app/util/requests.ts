@@ -1,6 +1,7 @@
 // Helper methods for making HTTP requests
 
 import fs from 'fs';
+import crypto from 'crypto';
 
 /**
  * Passing this function as your first "then" handler when making
@@ -73,3 +74,14 @@ function concatUint8Arrays(a: Uint8Array, b: Uint8Array) {
 }
 
 export const isUrl = (x: string): boolean => !!x.match(/^https?:/);
+
+export function getChecksum(filePath: string) {
+  return new Promise<string>((resolve, reject) => {
+    const file = fs.createReadStream(filePath);
+    const hash = crypto.createHash('md5');
+
+    file.on('data', data => hash.update(data));
+    file.on('end', () => resolve(hash.digest('hex')));
+    file.on('error', e => reject(e));
+  });
+}

@@ -106,6 +106,7 @@ export interface ILoadedApp {
   devPort?: number;
   icon?: string;
   enabled: boolean;
+  assets?: Dictionary<string>;
 }
 
 interface IPlatformAppServiceState {

@@ -7,7 +7,7 @@ import {
   TransitionsService,
 } from 'services/transitions';
 import { Inject } from 'util/injector';
-import { ILoadedApp, PlatformAppsService } from '../../index';
+import { PlatformAppsService } from '../../index';
 import { PlatformAppAssetsService } from 'services/platform-apps/platform-app-assets-service';
 
 type AudioFadeStyle = 'fadeOut' | 'crossFade';
@@ -104,15 +104,15 @@ export class SceneTransitionsModule extends Module {
   async createTransition(ctx: IApiContext, options: TransitionOptions): Promise<ITransition> {
     if (options.type === 'stinger') {
       const appId = ctx.app.id;
-      const { url } = options;
+      const { url: originalUrl } = options;
 
-      if (!this.isVideo(url)) {
+      if (!this.isVideo(originalUrl)) {
         throw new Error('Invalid file specified, you must provide a video file.');
       }
 
-      if (!this.platformAppAssetsService.hasAsset(appId, url)) {
+      if (!this.platformAppAssetsService.hasAsset(appId, originalUrl)) {
         // TODO: avoid mutation
-        options.url = await this.platformAppAssetsService.addPlatformAppAsset(appId, url);
+        options.url = await this.platformAppAssetsService.addPlatformAppAsset(appId, originalUrl);
       }
 
       const { shouldLock = false, name, ...settings } = options;
@@ -122,11 +122,21 @@ export class SceneTransitionsModule extends Module {
         ...settings,
       } as TransitionOptions);
 
-      return this.transitionsService.createTransition(
+      const transition = this.transitionsService.createTransition(
         ETransitionType.Stinger,
         name,
         transitionOptions,
       );
+
+      this.platformAppAssetsService.linkAsset(
+        appId,
+        options.url,
+        originalUrl,
+        'transition',
+        transition.id,
+      );
+
+      return transition;
     }
 
     throw new Error('Not Implemented');

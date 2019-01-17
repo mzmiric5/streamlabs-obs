@@ -1,5 +1,5 @@
 // Helper methods for making HTTP requests
-
+import request from 'request';
 import fs from 'fs';
 import crypto from 'crypto';
 
@@ -63,6 +63,16 @@ export async function downloadFile(srcUrl: string, dstPath: string): Promise<voi
         };
         return reader.read().then(readStream);
       });
+  });
+}
+
+export async function downloadFileAlt(srcUrl: string, dstPath: string) {
+  return new Promise((resolve, reject) => {
+    const writer = fs.createWriteStream(dstPath);
+    request.get(srcUrl).pipe(writer);
+
+    writer.on('finish', resolve);
+    writer.on('error', reject);
   });
 }
 

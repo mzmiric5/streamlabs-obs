@@ -2,7 +2,6 @@ import { mutation, StatefulService } from 'services/stateful-service';
 import path from 'path';
 import fs from 'fs';
 import request from 'request';
-import crypto from 'crypto';
 import { Inject } from 'util/injector';
 import { HostsService } from 'services/hosts';
 import { UserService } from 'services/user';

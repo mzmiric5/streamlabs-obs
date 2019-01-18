@@ -45,6 +45,7 @@ export function authorizedHeaders(token: string, headers = new Headers()): Heade
   return headers;
 }
 
+// DEPRECATED: this is synchronous and also complex
 export async function downloadFile(srcUrl: string, dstPath: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     return fetch(srcUrl)

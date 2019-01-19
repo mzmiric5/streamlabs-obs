@@ -11,6 +11,10 @@
       <p class="app-platform-details">
         {{ currentlyLoadedUnpackedApp.appPath }}
       </p>
+      <h4>Custom URL</h4>
+      <p class="app-platform-details">
+        {{ currentlyLoadedUnpackedApp.appCustomUrl }}
+      </p>
       <h4>Token</h4>
       <p class="app-platform-details">
         {{ currentlyLoadedUnpackedApp.appToken }}
@@ -26,6 +30,7 @@
     </div>
     <div v-else>
       <VFormGroup :metadata="appPathMetadata" v-model="appPathValue" />
+      <VFormGroup :metadata="appCustomUrlMetadata" v-model="appCustomUrlValue" />
       <VFormGroup :metadata="appTokenMetadata" v-model="appTokenValue" />
       <button @click="loadApp" class="button button--action" :disabled="loading">
         Load App

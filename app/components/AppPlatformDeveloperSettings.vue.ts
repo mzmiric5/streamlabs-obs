@@ -22,6 +22,14 @@ export default class AppPlatformDeveloperSettings extends Vue {
 
   appPathValue = this.currentlyLoadedUnpackedApp ? this.currentlyLoadedUnpackedApp.appPath : '';
 
+  appCustomUrlMetadata = metadata.text({
+    title: 'App Custom URL',
+    description:
+      'This is the custom URL to your unpacked app.',
+  });
+
+  appCustomUrlValue = this.currentlyLoadedUnpackedApp ? this.currentlyLoadedUnpackedApp.appCustomUrl : '';
+
   appTokenMetadata = metadata.text({
     title: 'App Token',
     description:
@@ -54,6 +62,7 @@ export default class AppPlatformDeveloperSettings extends Vue {
     try {
       this.error = await this.platformAppsService.installUnpackedApp(
         this.appPathValue,
+        this.appCustomUrlValue,
         this.appTokenValue,
       );
     } catch (e) {

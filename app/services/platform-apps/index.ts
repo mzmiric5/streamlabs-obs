@@ -103,6 +103,7 @@ export interface ILoadedApp {
   poppedOutSlots: EAppPageSlot[];
   appPath?: string;
   appUrl?: string;
+  appCustomUrl?: string;
   devPort?: number;
   icon?: string;
   enabled: boolean;
@@ -174,7 +175,7 @@ export class PlatformAppsService extends StatefulService<IPlatformAppServiceStat
     if (this.state.devMode && localStorage.getItem(this.unpackedLocalStorageKey)) {
       const data = JSON.parse(localStorage.getItem(this.unpackedLocalStorageKey));
       if (data.appPath && data.appToken) {
-        this.installUnpackedApp(data.appPath, data.appToken);
+        this.installUnpackedApp(data.appPath, data.appCustomUrl, data.appToken);
       }
     }
   }
@@ -245,7 +246,7 @@ export class PlatformAppsService extends StatefulService<IPlatformAppServiceStat
   /**
    * For now, there can only be 1 unpacked app at a time
    */
-  async installUnpackedApp(appPath: string, appToken: string) {
+  async installUnpackedApp(appPath: string, appCustomUrl: string = null, appToken: string) {
     const id = await this.getAppIdFromServer(appToken);
 
     if (id == null) {
@@ -262,7 +263,7 @@ export class PlatformAppsService extends StatefulService<IPlatformAppServiceStat
     const manifest = JSON.parse(manifestData) as IAppManifest;
 
     try {
-      await this.validateManifest(manifest, appPath);
+      await this.validateManifest(manifest, appPath, appCustomUrl);
     } catch (e) {
       return e.message;
     }
@@ -273,7 +274,9 @@ export class PlatformAppsService extends StatefulService<IPlatformAppServiceStat
       this.devServer = null;
     }
 
-    this.devServer = new DevServer(appPath, DEV_PORT);
+    if (!appCustomUrl) {
+      this.devServer = new DevServer(appPath, DEV_PORT);
+    }
 
     if (this.state.loadedApps.find(loadedApp => loadedApp.id === id && !loadedApp.unpacked)) {
       // has prod app with same id
@@ -285,6 +288,7 @@ export class PlatformAppsService extends StatefulService<IPlatformAppServiceStat
       id,
       manifest,
       appPath,
+      appCustomUrl,
       appToken,
       unpacked: true,
       beta: false,
@@ -320,13 +324,14 @@ export class PlatformAppsService extends StatefulService<IPlatformAppServiceStat
         JSON.stringify({
           appToken,
           appPath: app.appPath,
+          appCustomUrl: app.appCustomUrl,
         }),
       );
     }
     this.appLoad.next(this.getApp(id));
   }
 
-  async validateManifest(manifest: IAppManifest, appPath: string) {
+  async validateManifest(manifest: IAppManifest, appPath: string, appCustomUrl: string = null) {
     // Validate top level of the manifest
     this.validateObject(manifest, 'manifest', [
       'name',
@@ -355,7 +360,7 @@ export class PlatformAppsService extends StatefulService<IPlatformAppServiceStat
       const filePath = this.getFilePath(appPath, manifest.buildPath, source.file, true);
       const exists = await this.fileExists(filePath);
 
-      if (!exists) {
+      if (!exists && !appCustomUrl) {
         throw new Error(
           `Missing file: manifest.sources[${i}].file does not exist. Searching at path: ${filePath}`,
         );
@@ -384,7 +389,7 @@ export class PlatformAppsService extends StatefulService<IPlatformAppServiceStat
       const filePath = this.getFilePath(appPath, manifest.buildPath, page.file, true);
       const exists = await this.fileExists(filePath);
 
-      if (!exists) {
+      if (!exists && !appCustomUrl) {
         throw new Error(
           `Missing file: manifest.pages[${i}].file does not exist. Searching at path: ${filePath}`,
         );
@@ -446,7 +451,7 @@ export class PlatformAppsService extends StatefulService<IPlatformAppServiceStat
     const manifest = JSON.parse(await this.loadManifestFromDisk(manifestPath));
 
     try {
-      await this.validateManifest(manifest, app.appPath);
+      await this.validateManifest(manifest, app.appPath, app.appCustomUrl);
     } catch (e) {
       this.unloadApps();
       return e.message;
@@ -586,6 +591,11 @@ export class PlatformAppsService extends StatefulService<IPlatformAppServiceStat
             return;
           }
 
+          if (app.unpacked && app.appCustomUrl && details.url.startsWith(app.appCustomUrl)) {
+            cb({});
+            return;
+          }
+
           if (parsed.host === `localhost:${DEV_PORT}`) {
             cb({});
             return;
@@ -658,8 +668,8 @@ export class PlatformAppsService extends StatefulService<IPlatformAppServiceStat
     let url: string;
 
     if (app.unpacked) {
-      const trimmed = trim(app.manifest.buildPath, '/ ');
-      url = compact([`http://localhost:${app.devPort}`, trimmed, asset]).join('/');
+      const trimmed = app.appCustomUrl ? '' : trim(app.manifest.buildPath, '/ ');
+      url = compact([app.appCustomUrl ? app.appCustomUrl : `http://localhost:${app.devPort}`, trimmed, asset]).join('/');
     } else {
       url = compact([app.appUrl, asset]).join('/');
     }

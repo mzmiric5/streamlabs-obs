@@ -30,6 +30,7 @@ const obs = require('obs-studio-node');
 const pid = require('process').pid;
 const crashHandler = require('crash-handler');
 const electronLog = require('electron-log');
+const { URL } = require('url');
 
 if (process.argv.includes('--clearCacheDir')) {
   rimraf.sync(app.getPath('userData'));
@@ -476,8 +477,18 @@ ipcMain.on('streamlabels-writeFile', (e, info) => {
 });
 
 ipcMain.on('webContents-preventNavigation', (e, id) => {
-  webContents.fromId(id).on('will-navigate', e => {
-    e.preventDefault();
+  webContents.fromId(id).on('will-navigate', (e, url) => {
+    const parsedURL = new URL(url);
+    const wcon = webContents.fromId(id);
+    if (wcon) {
+      const prevURL = wcon.getURL();
+      const parsedPrevURL = new URL(prevURL);
+      if (parsedPrevURL.host !== parsedURL.host) {
+        e.preventDefault();
+      }
+    } else {
+      e.preventDefault();
+    }
   });
 });
 

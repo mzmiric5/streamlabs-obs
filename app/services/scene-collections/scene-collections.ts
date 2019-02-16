@@ -139,7 +139,7 @@ export class SceneCollectionsService extends Service implements ISceneCollection
    * Generally called on application shutdown.
    */
   async deinitialize() {
-    this.disableAutoSave();
+    await this.disableAutoSave();
     await this.save();
     await this.deloadCurrentApplicationState();
     await this.safeSync();
@@ -222,17 +222,20 @@ export class SceneCollectionsService extends Service implements ISceneCollection
   async delete(id?: string): Promise<void> {
     // tslint:disable-next-line:no-parameter-reassignment TODO
     id = id || this.activeCollection.id;
-
     const removingActiveCollection = id === this.activeCollection.id;
 
-    await this.removeCollection(id);
-
     if (removingActiveCollection) {
-      if (this.collections.length > 0) {
-        await this.load(this.collections[0].id);
-      } else {
-        await this.create();
-      }
+      this.appService.runInLoadingMode(async () => {
+        await this.removeCollection(id);
+
+        if (this.collections.length > 0) {
+          await this.load(this.collections[0].id);
+        } else {
+          await this.create();
+        }
+      });
+    } else {
+      await this.removeCollection(id);
     }
   }
 
@@ -280,7 +283,7 @@ export class SceneCollectionsService extends Service implements ISceneCollection
    * @param id An optional ID, if omitted the active collection ID is used
    */
   async duplicate(name: string, id?: string) {
-    this.disableAutoSave();
+    await this.disableAutoSave();
 
     // tslint:disable-next-line:no-parameter-reassignment TODO
     id = id || this.activeCollection.id;
@@ -540,7 +543,7 @@ export class SceneCollectionsService extends Service implements ISceneCollection
 
     this.collectionWillSwitch.next();
 
-    this.disableAutoSave();
+    await this.disableAutoSave();
     await this.save();
 
     // we should remove inactive scenes first to avoid the switching between scenes
@@ -621,18 +624,23 @@ export class SceneCollectionsService extends Service implements ISceneCollection
   }
 
   private autoSaveInterval: number;
+  private autoSavePromise: Promise<void>;
 
   enableAutoSave() {
     if (this.autoSaveInterval) return;
-    this.autoSaveInterval = window.setInterval(() => {
-      this.save();
+    this.autoSaveInterval = window.setInterval(async () => {
+      this.autoSavePromise = this.save();
+      await this.autoSavePromise;
       this.stateService.flushManifestFile();
     }, 60 * 1000);
   }
 
-  disableAutoSave() {
+  async disableAutoSave() {
     if (this.autoSaveInterval) clearInterval(this.autoSaveInterval);
     this.autoSaveInterval = null;
+
+    // Wait for the current saving process to finish
+    if (this.autoSavePromise) await this.autoSavePromise;
   }
 
   private async setActiveCollection(id: string) {

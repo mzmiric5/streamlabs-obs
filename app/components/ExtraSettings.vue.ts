@@ -34,8 +34,16 @@ export default class ExtraSettings extends Vue {
     this.customizationService.setUpdateStreamInfoOnLive(value);
   }
 
+  get navigateToLive() {
+    return this.customizationService.state.navigateToLiveOnStreamStart;
+  }
+
+  set navigateToLive(value: boolean) {
+    this.customizationService.setNavigateToLive(value);
+  }
+
   showCacheDir() {
-    electron.remote.shell.showItemInFolder(electron.remote.app.getPath('userData'));
+    electron.remote.shell.openItem(electron.remote.app.getPath('userData'));
   }
 
   deleteCacheDir() {
@@ -75,12 +83,16 @@ export default class ExtraSettings extends Vue {
     this.windowsService.closeChildWindow();
   }
 
+  get isLoggedIn() {
+    return this.userService.isLoggedIn();
+  }
+
   get isTwitch() {
-    return this.userService.isLoggedIn() && this.userService.platform.type === 'twitch';
+    return this.isLoggedIn && this.userService.platform.type === 'twitch';
   }
 
   get isFacebook() {
-    return this.userService.isLoggedIn() && this.userService.platform.type === 'facebook';
+    return this.isLoggedIn && this.userService.platform.type === 'facebook';
   }
 
   get isRecordingOrStreaming() {

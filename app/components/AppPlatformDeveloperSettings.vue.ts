@@ -61,9 +61,9 @@ export default class AppPlatformDeveloperSettings extends Vue {
 
     try {
       this.error = await this.platformAppsService.loadUnpackedApp(
-        this.appPathValue,
-        this.appCustomUrlValue,
+        this.appPathValue,       
         this.appTokenValue,
+        this.appCustomUrlValue
       );
     } catch (e) {
       this.error =
